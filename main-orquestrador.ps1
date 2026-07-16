@@ -109,6 +109,7 @@ function Invoke-MenuItem([string]$FunctionName) {
 
 $menu = [ordered]@{
     "1" = @{ Label = "Performance / Energia";  Fn = "Enable-UltimatePerformance-Interactive" }
+    "15"= @{ Label = "Hibernar ao Fechar a Tampa (Notebooks)"; Fn = "Enable-Hibernate-OnLidClose-Interactive" }
     "2" = @{ Label = "Limpeza de Sistema";     Fn = "System-Cleanup-Interactive" }
     "3" = @{ Label = "Remover Bloatwares";     Fn = "Remove-Bloatwares-Interactive" }
     "4" = @{ Label = "Privacidade";            Fn = "Privacy-Interactive" }
