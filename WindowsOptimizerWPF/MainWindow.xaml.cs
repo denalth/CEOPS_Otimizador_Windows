@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Management;
 using System.Reflection;
 using System.Security.Principal;
 using System.Threading.Tasks;
@@ -17,13 +18,17 @@ namespace WindowsOptimizer
     public partial class MainWindow : Window
     {
         // Versão única centralizada (source of truth) — bug #5
-        private const string AppVersion = "7.0.0";
+        private const string AppVersion = "7.1.0";
         // Repo correto — bug #1
         private const string RepoOwner = "denalth";
         private const string RepoName = "CEOPS_Otimizador_Windows";
         // static readonly (não const) para permitir interpolação com compatibilidade total
         private static readonly string VersionUrl = $"https://raw.githubusercontent.com/{RepoOwner}/{RepoName}/main/version.txt";
         private static readonly string ReleasesUrl = $"https://github.com/{RepoOwner}/{RepoName}/releases";
+
+        // v7.1.0: detecta se o equipamento e portatil (notebook/laptop com bateria ou tampa).
+        // Usado para mostrar/ocultar a acao "Hibernar ao fechar a tampa" apenas onde faz sentido.
+        private readonly bool _isPortable;
 
         public MainWindow()
         {
@@ -35,8 +40,11 @@ namespace WindowsOptimizer
             }
 
             InitializeComponent();
+            _isPortable = IsPortableDevice(); // v7.1.0: detecção de bateria/chassis
             AddLog("INFO", $"🚀 Windows Optimizer v{AppVersion} iniciado!");
             AddLog("INFO", "👋 Bem-vindo, @denalth!");
+            if (_isPortable)
+                AddLog("INFO", "💻 Equipamento portátil detectado (notebook/laptop).");
         }
 
         // === ELEVAÇÃO DE PRIVILÉGIO ===
@@ -124,6 +132,9 @@ namespace WindowsOptimizer
                     AddActionCard("🎮 HAGS (GPU Scheduling)", "Melhora a fluidez em jogos com agendamento de GPU", () => RunHAGS());
                     AddActionCard("🕹️ Game Mode", "Prioriza recursos do sistema para jogos", () => RunGameMode());
                     AddActionCard("📶 Otimizar TCP/IP", "Reduz latência de rede para melhor ping", () => RunTCPOptimize());
+                    // v7.1.0: só mostra em portáteis (notebook/laptop) — desktops não têm tampa.
+                    if (_isPortable)
+                        AddActionCard("💻 Hibernar ao Fechar a Tampa", "Ativa hibernação e faz o PC hibernar ao fechar a tampa (na tomada e na bateria)", () => RunEnableHibernateOnLidClose());
                     AddActionCard("💤 Desativar Hibernação", "Libera espaço em disco removendo hiberfil.sys", () => RunDisableHibernation());
                     AddActionCard("🔋 Relatório de Energia", "Gera diagnóstico completo de energia e abre no navegador", () => RunEnergyReport());
                     break;
@@ -437,6 +448,140 @@ namespace WindowsOptimizer
         {
             RunCommand("powercfg", "/h off");
             AddLog("OK", "💤 Hibernação desativada!");
+        }
+
+        // === v7.1.0: DETECÇÃO DE EQUIPAMENTO PORTÁTIL ===
+        // Verifica várias fontes WMI: qualquer uma verdadeira = portátil.
+        // Chassis: 9=Laptop, 10=Notebook, 14=Sub Notebook, 30=Tablet
+        private static bool IsPortableDevice()
+        {
+            try
+            {
+                // 1. Bateria presente (Win32_Battery ou Win32_PortableBattery)
+                try
+                {
+                    using (var searcher = new ManagementObjectSearcher("SELECT * FROM Win32_Battery"))
+                        if (searcher.Get().Count > 0) return true;
+                }
+                catch { /* algumas VMs não implementam */ }
+                try
+                {
+                    using (var searcher = new ManagementObjectSearcher("SELECT * FROM Win32_PortableBattery"))
+                        if (searcher.Get().Count > 0) return true;
+                }
+                catch { /* idem */ }
+
+                // 2. Chassis type laptop/notebook/sub-notebook/tablet
+                try
+                {
+                    using (var searcher = new ManagementObjectSearcher("SELECT ChassisTypes FROM Win32_SystemEnclosure"))
+                    {
+                        foreach (ManagementObject obj in searcher.Get())
+                        {
+                            var types = obj["ChassisTypes"] as ushort[];
+                            if (types != null)
+                            {
+                                int[] portable = { 8, 9, 10, 11, 14, 30, 31, 32 };
+                                foreach (var t in types)
+                                    if (portable.Contains(t)) return true;
+                            }
+                        }
+                    }
+                }
+                catch { /* WMI indisponível */ }
+
+                // 3. Fallback: PCSystemType == 2 (Mobile) via Win32_ComputerSystem
+                try
+                {
+                    using (var searcher = new ManagementObjectSearcher("SELECT PCSystemType FROM Win32_ComputerSystem"))
+                    {
+                        foreach (ManagementObject obj in searcher.Get())
+                            if (Convert.ToInt32(obj["PCSystemType"]) == 2) return true;
+                    }
+                }
+                catch { /* WMI indisponível */ }
+            }
+            catch { /* falha geral de WMI — assume desktop */ }
+            return false;
+        }
+
+        // === v7.1.0: HIBERNAR AO FECHAR A TAMPA (AC + DC) ===
+        // Requer equipamento portátil (verificado ao montar o card).
+        // Passos:
+        //   1. powercfg /a            -> confirma suporte a hibernação no hardware
+        //   2. powercfg /hibernate on -> ativa hibernação (cria hiberfil.sys)
+        //   3. SETACVALUEINDEX        -> ao fechar a tampa na TOMADA = Hibernar (2)
+        //   4. SETDCVALUEINDEX        -> ao fechar a tampa na BATERIA = Hibernar (2)
+        //   5. SETACTIVE              -> aplica o plano corrente
+        // SUB_BUTTONS/LIDACTION: alias canônico do Windows para a ação da tampa.
+        private void RunEnableHibernateOnLidClose()
+        {
+            // Alias fixos do Windows (não mudam entre versões)
+            const string SUB_BUTTONS = "4f971e89-eebd-4455-a8de-9e59040e7347";
+            const string LIDACTION = "5ca83367-6e45-459f-a27b-476b1d01c936";
+            // Valor 2 = Hibernate (0=Nothing, 1=Sleep, 2=Hibernate, 3=Shut down)
+
+            AddLog("EXEC", "Configurando hibernação ao fechar a tampa...");
+
+            // 1. Verifica se o hardware suporta hibernação
+            if (!HardwareSupportsHibernation())
+            {
+                AddLog("WARN", "⚠️ Este hardware não suporta hibernação (powercfg /a). Ação cancelada.");
+                return;
+            }
+
+            // 2. Ativa a hibernação (cria hiberfil.sys; pode falhar se faltar espaço em disco)
+            int code = RunCommandSyncReturn("powercfg", "/hibernate on");
+            if (code != 0)
+            {
+                AddLog("ERRO", $"Falha ao ativar hibernação (powercfg /hibernate on saiu com {code}). Verifique espaço em disco (hiberfil.sys ocupa ~40% da RAM).");
+                return;
+            }
+            AddLog("OK", "Hibernação ativada.");
+
+            // 3. AC (na tomada) = Hibernar ao fechar a tampa
+            code = RunCommandSyncReturn("powercfg", $"/SETACVALUEINDEX SCHEME_CURRENT {SUB_BUTTONS} {LIDACTION} 2");
+            if (code != 0) { AddLog("ERRO", $"Falha ao configurar LidAction AC (saiu com {code})."); return; }
+            AddLog("OK", "Ao fechar a tampa NA TOMADA: hibernar.");
+
+            // 4. DC (na bateria) = Hibernar ao fechar a tampa
+            code = RunCommandSyncReturn("powercfg", $"/SETDCVALUEINDEX SCHEME_CURRENT {SUB_BUTTONS} {LIDACTION} 2");
+            if (code != 0) { AddLog("ERRO", $"Falha ao configurar LidAction DC (saiu com {code})."); return; }
+            AddLog("OK", "Ao fechar a tampa NA BATERIA: hibernar.");
+
+            // 5. Aplica o plano corrente
+            code = RunCommandSyncReturn("powercfg", "/SETACTIVE SCHEME_CURRENT");
+            if (code != 0) { AddLog("WARN", $"Configuração salva, mas powercfg /SETACTIVE saiu com {code}."); }
+            else AddLog("OK", "💻 Feche a tampa para hibernar (tomada e bateria).");
+        }
+
+        // Roda powercfg /a e checa se "Hibernação" aparece como disponível.
+        private bool HardwareSupportsHibernation()
+        {
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "powercfg",
+                    Arguments = "/a",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true
+                };
+                using (var proc = Process.Start(psi))
+                {
+                    string output = proc.StandardOutput.ReadToEnd();
+                    proc.WaitForExit();
+                    // "Hibernação" aparece quando suportado (pode vir como "Hibernation"/"Hibernação")
+                    return output.IndexOf("Hibernação", StringComparison.OrdinalIgnoreCase) >= 0
+                        || output.IndexOf("Hibernate", StringComparison.OrdinalIgnoreCase) >= 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                AddLog("ERRO", $"Não foi possível verificar suporte a hibernação: {ex.Message}");
+                return false;
+            }
         }
 
         private void RunEnergyReport()

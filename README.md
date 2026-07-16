@@ -1,12 +1,16 @@
 # Autoria: @denalth
-# Windows Optimizer v7.0.0 (Interface WPF Premium)
+# Windows Optimizer v7.1.0 (Interface WPF Premium)
 
 O otimizador definitivo para Windows 11 com **interface WPF moderna**, **emojis coloridos** e **acentuação pt-BR**.
 
-![Version](https://img.shields.io/badge/Version-7.0.0-blue)
+![Version](https://img.shields.io/badge/Version-7.1.0-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-## ✨ Novidades da v7.0.0
+## ✨ Novidades da v7.1.0
+- 💻 **Hibernar ao Fechar a Tampa**: em notebooks, ativa hibernação e faz o PC hibernar ao fechar a tampa (na tomada **e** na bateria). Detecção automática de equipamento portátil — o card só aparece em laptops.
+- 🧹 **Detecção de hardware**: verifica suporte a hibernação (`powercfg /a`) e avisa quando o hardware não suporta.
+
+## 📜 Novidades da v7.0.0
 - 🧹 **Refatoração Arquitetural**: eliminação da triplicação de código (uma única GUI WPF C#).
 - ⚡ **UI Não-Bloqueante**: ações executam em background com `async/await` + `Task.Run` (a janela não congela mais).
 - 🌐 **DNS Inteligente**: aplica DNS em todos os adaptadores ativos (Wi-Fi e Ethernet), não apenas "Ethernet".

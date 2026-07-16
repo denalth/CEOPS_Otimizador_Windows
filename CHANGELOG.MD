@@ -1,6 +1,23 @@
 # Autoria: @denalth
 # Changelog - Windows Optimizer
 
+## [7.1.0] - 2026-07-16 (Hibernação ao Fechar a Tampa)
+
+### ✨ Adicionado
+- **Hibernar ao fechar a tampa** (notebooks/laptops): ativa a hibernação e configura `LidAction=Hibernate` tanto em AC (tomada) quanto DC (bateria).
+- **Detecção automática de equipamento portátil**: o card só aparece quando o equipamento tem bateria (`Win32_Battery`/`Win32_PortableBattery`) OU é chassis laptop/notebook/sub-notebook/tablet (`Win32_SystemEnclosure`).
+- **Validação de suporte a hibernação**: roda `powercfg /a` antes de aplicar e avisa se o hardware não suporta.
+- Nova função de terminal `Enable-Hibernate-OnLidClose-Interactive` em `modules/energy.ps1` (conectada ao `main-orquestrador.ps1`).
+- Referência `System.Management` adicionada ao `.csproj` (WMI).
+
+### 🔧 Alterado
+- Bump de versão: 7.0.0 → 7.1.0 (SemVer MINOR — nova feature compatível).
+
+### 🗑️ Removido / Consolidado
+- `docs/task.md`, `docs/implementation_plan.md`, `docs/ROADMAP_UX_GUI.md` (obsoletos — descreviam fases ultrapassadas) consolidados em `docs/HISTORICO.md`.
+
+---
+
 ## [7.0.0] - 2026-07-15 (Refatoração Arquitetural — BUILD VALIDADO)
 
 ### ⚠️ Breaking Changes

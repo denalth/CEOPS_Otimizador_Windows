@@ -76,7 +76,8 @@ Sempre utilize o seguinte formato para estruturar o seu raciocínio e a entrega:
         ```bash
         git add .
         git commit -m "release vX.X.X"
-        git tag vX.X.X -m "Versão X.X.X"
+        # Tag ANOTADA (guarda autor, data e mensagem) — sempre preferir a leve
+        git tag -a vX.X.X -m "Versão X.X.X"
         ```
     *   Justificativa do incremento de versão.
 
