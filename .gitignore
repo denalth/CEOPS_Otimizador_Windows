@@ -28,3 +28,11 @@ orquestrador-package/
 
 # Git
 *.orig
+
+# Binários / build artifacts — nunca versionar executáveis (bug #11)
+*.exe
+*.dll
+bin/
+obj/
+[Bb]uild/
+*.pdb
