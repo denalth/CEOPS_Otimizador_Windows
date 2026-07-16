@@ -6,8 +6,14 @@
     <RootNamespace>WindowsOptimizer</RootNamespace>
     <AssemblyName>WindowsOptimizer</AssemblyName>
     <Version>7.0.0</Version>
+    <AssemblyVersion>7.0.0.0</AssemblyVersion>
+    <FileVersion>7.0.0.0</FileVersion>
     <Authors>@denalth</Authors>
+    <Company>@denalth</Company>
     <Product>Windows Optimizer</Product>
+    <Copyright>Copyright © @denalth 2026</Copyright>
     <Description>Otimizador de Sistema Windows - Interface WPF Premium com Emojis</Description>
+    <!-- Versão mais recente da linguagem C# (habilita constantes interpoladas, etc.) -->
+    <LangVersion>latest</LangVersion>
   </PropertyGroup>
 </Project>

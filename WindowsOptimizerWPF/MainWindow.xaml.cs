@@ -21,8 +21,9 @@ namespace WindowsOptimizer
         // Repo correto — bug #1
         private const string RepoOwner = "denalth";
         private const string RepoName = "CEOPS_Otimizador_Windows";
-        private const string VersionUrl = $"https://raw.githubusercontent.com/{RepoOwner}/{RepoName}/main/version.txt";
-        private const string ReleasesUrl = $"https://github.com/{RepoOwner}/{RepoName}/releases";
+        // static readonly (não const) para permitir interpolação com compatibilidade total
+        private static readonly string VersionUrl = $"https://raw.githubusercontent.com/{RepoOwner}/{RepoName}/main/version.txt";
+        private static readonly string ReleasesUrl = $"https://github.com/{RepoOwner}/{RepoName}/releases";
 
         public MainWindow()
         {
