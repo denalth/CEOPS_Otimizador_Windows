@@ -1,25 +1,40 @@
 # Autoria: @denalth
-# Windows Optimizer v6.0.4 (Interface WPF Premium)
+# Windows Optimizer v7.0.0 (Interface WPF Premium)
 
 O otimizador definitivo para Windows 11 com **interface WPF moderna**, **emojis coloridos** e **acentuação pt-BR**.
 
-![Version](https://img.shields.io/badge/Version-6.0.0-blue)
+![Version](https://img.shields.io/badge/Version-7.0.0-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-## ✨ Novidades da v6.0.4
-- 🎨 **Interface WPF Premium**: Design inspirado no GitHub Dark com cores vibrantes.
-- 🎭 **Emojis Coloridos**: Cada categoria tem seu emoji temático.
-- 🇧🇷 **Acentuação Completa**: Textos em português brasileiro perfeito.
-- ⚡ **57 Ações Reais**: Com validação e feedback transparente.
+## ✨ Novidades da v7.0.0
+- 🧹 **Refatoração Arquitetural**: eliminação da triplicação de código (uma única GUI WPF C#).
+- ⚡ **UI Não-Bloqueante**: ações executam em background com `async/await` + `Task.Run` (a janela não congela mais).
+- 🌐 **DNS Inteligente**: aplica DNS em todos os adaptadores ativos (Wi-Fi e Ethernet), não apenas "Ethernet".
+- ☁️ **OneDrive Multi-Path**: detecta instalação em SysWOW64, System32 ou per-user, com fallback via winget.
+- 🗑️ **Limpeza Completa**: TEMP recursivo (arquivos + subpastas) e Lixeira de todas as unidades.
+- 🔒 **Self-Update Corrigido**: aponta para o repositório correto e compara versões semanticamente (`System.Version`).
+- 🔐 **Auto-Elevação**: a própria GUI verifica privilégios de admin e se re-eleva via UAC.
 
 ## 🚀 Início Rápido
-1. Execute `WindowsOptimizer.exe` como Administrador.
-2. Selecione uma categoria no menu lateral (com emojis!).
-3. Clique em EXECUTAR e acompanhe o log em tempo real.
+1. Compile o projeto WPF (`dotnet build WindowsOptimizerWPF`) **ou** execute `WindowsOptimizer.exe`.
+2. O app pede elevação de administrador automaticamente (UAC).
+3. Selecione uma categoria no menu lateral (com emojis!).
+4. Clique em EXECUTAR e acompanhe o log em tempo real.
+
+## 🖥️ Modo Terminal (sem GUI)
+Para uso em linha de comando, use o orquestrador:
+```powershell
+powershell -ExecutionPolicy Bypass -File main-orquestrador.ps1
+```
 
 ## 📦 Categorias
 ⚡ Performance | 🧹 Limpeza | 🛡️ Segurança | 🔒 Privacidade | 🎨 Visuais | ⚙️ Serviços | 🔄 Windows Update | 💻 Dev Tools | 📦 SDKs | 🐧 WSL2 | 🌐 Rede | 🗑️ Bloatwares | 👤 Perfis | 🚀 Self-Update
 
-Desenvolvido com 💜 por @denalth | 2025
+## 🏗️ Arquitetura
+```
+WindowsOptimizerWPF/   → GUI WPF C# (única interface)
+modules/*.ps1          → Backend modular de otimização (terminal)
+main-orquestrador.ps1  → Menu de terminal que carrega os módulos
+```
 
-
+Desenvolvido com 💜 por @denalth | 2026
