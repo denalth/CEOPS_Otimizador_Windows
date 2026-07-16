@@ -1,6 +1,43 @@
 # Autoria: @denalth
 # Changelog - Windows Optimizer
 
+## [7.0.0] - 2026-07-15 (Refatoração Arquitetural — BUILD VALIDADO)
+
+### ⚠️ Breaking Changes
+- **Removida a GUI PowerShell** (`Lancar_GUI.ps1`) — era uma duplicata da WPF C#.
+- **Removido o launcher WinForms** (`WindowsOptimizerApp/Program.cs`) — a WPF agora se auto-eleva via UAC.
+- **Removido o binário commitado** (`WindowsOptimizer.exe`) — agora é gerado no build.
+
+### ✨ Adicionado
+- **`main-orquestrador.ps1`**: menu de terminal que carrega todos os `modules/*.ps1` (resolve o app de terminal órfão).
+- **Auto-elevação UAC**: a GUI WPF verifica privilégios de admin e se re-eleva.
+- **`<LangVersion>latest</LangVersion>`** no `.csproj` (recursos C# modernos).
+- **Helper `Invoke-IfAvailable`** em `profiles.ps1` (avisa quando um módulo falta).
+
+### 🔧 Corrigido
+- **#1 Self-Update**: URL agora aponta para `CEOPS_Otimizador_Windows` (antes: `otimizador_windows` inexistente).
+- **#2 Triplicação de código**: eliminadas as 3 codebases duplicadas (modules + 2 GUIs → 1 WPF + modules).
+- **#3 UI congela**: ações executam em `Task.Run`/`async/await` (não bloqueia mais a thread de UI).
+- **#4 DNS "Ethernet" hardcoded**: agora aplica em todos os adaptadores ativos via `Get-NetAdapter`.
+- **#5 Versão fora de sync**: 7.0.0 unificada em todos os arquivos + comparação via `System.Version`.
+- **#6 Funções inexistentes**: `profiles.ps1` chamava `Show-SupremeGUI` e `Install-DevTools-Essentials` (corrigido).
+- **#8 OneDrive path hardcoded**: detecta SysWOW64/System32/per-user + fallback `winget uninstall`.
+- **#9 CleanTemp parcial**: agora recursivo (arquivos + subdiretórios).
+- **#10 RecycleBin só C:**: trocado por `Clear-RecycleBin -Force` (todas as unidades).
+- **#13 Mojibake**: GUI reescrita, emojis e acentuação corrigidos.
+
+### 🗑️ Removido
+- `Lancar_GUI.ps1` (GUI PowerShell duplicada)
+- `WindowsOptimizerApp/Program.cs` + pasta (launcher WinForms redundante)
+- `WindowsOptimizer.exe` (binário commitado)
+- `WindowsOptimizerWPF/AssemblyInfo.cs` (conflitava com o gerado pelo SDK-style)
+
+### 🏗️ Build
+- Validado com .NET SDK 8: **0 erros, 0 avisos**.
+- Metadados de assembly movidos do `AssemblyInfo.cs` para o `.csproj`.
+
+---
+
 ## [6.0.4] - 2025-12-27 (Botões Completos)
 ### Adicionado
 - **Eventos de Clique**: Todos os 14 botões de categoria agora funcionam (Dev Tools, SDKs, WSL2, Perfis).
