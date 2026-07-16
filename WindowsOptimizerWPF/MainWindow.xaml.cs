@@ -1,25 +1,95 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
+using System.Reflection;
+using System.Security.Principal;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using Microsoft.Win32;
-using System.ServiceProcess;
-using System.Management;
 
 namespace WindowsOptimizer
 {
     public partial class MainWindow : Window
     {
+        // Versão única centralizada (source of truth) — bug #5
+        private const string AppVersion = "7.0.0";
+        // Repo correto — bug #1
+        private const string RepoOwner = "denalth";
+        private const string RepoName = "CEOPS_Otimizador_Windows";
+        // static readonly (não const) para permitir interpolação com compatibilidade total
+        private static readonly string VersionUrl = $"https://raw.githubusercontent.com/{RepoOwner}/{RepoName}/main/version.txt";
+        private static readonly string ReleasesUrl = $"https://github.com/{RepoOwner}/{RepoName}/releases";
+
         public MainWindow()
         {
+            // Auto-elevação: substitui o Program.cs (WinForms launcher) deletado na Fase 1
+            if (!IsAdministrator())
+            {
+                RelaunchAsAdmin();
+                return;
+            }
+
             InitializeComponent();
-            AddLog("INFO", "🚀 Windows Optimizer v6.0.0 iniciado!");
+            AddLog("INFO", $"🚀 Windows Optimizer v{AppVersion} iniciado!");
             AddLog("INFO", "👋 Bem-vindo, @denalth!");
         }
 
+        // === ELEVAÇÃO DE PRIVILÉGIO ===
+
+        private static bool IsAdministrator()
+        {
+            try
+            {
+                using (var identity = WindowsIdentity.GetCurrent())
+                {
+                    var principal = new WindowsPrincipal(identity);
+                    return principal.IsInRole(WindowsBuiltInRole.Administrator);
+                }
+            }
+            catch { return false; }
+        }
+
+        private static void RelaunchAsAdmin()
+        {
+            try
+            {
+                var exePath = Assembly.GetExecutingAssembly().Location;
+                if (string.IsNullOrEmpty(exePath))
+                    exePath = Environment.GetCommandLineArgs()[0];
+
+                var psi = new ProcessStartInfo
+                {
+                    FileName = exePath,
+                    UseShellExecute = true,
+                    Verb = "runas"
+                };
+                Process.Start(psi);
+            }
+            catch { /* Usuário cancelou o UAC */ }
+            Application.Current?.Shutdown();
+        }
+
+        // === LOG THREAD-SAFE ===
+        // AddLog usa Dispatcher para que tasks em background (Task.Run) possam
+        // atualizar o LogBox com segurança — bug #3 (UI não congela + log correto).
+
         private void AddLog(string type, string message)
+        {
+            // Sempre na thread da UI via Dispatcher (thread-safe para background tasks)
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.BeginInvoke(new Action(() => AddLogCore(type, message)));
+                return;
+            }
+            AddLogCore(type, message);
+        }
+
+        private void AddLogCore(string type, string message)
         {
             string timestamp = DateTime.Now.ToString("HH:mm:ss");
             LogBox.AppendText($"[{timestamp}][{type}] {message}\n");
@@ -36,7 +106,7 @@ namespace WindowsOptimizer
         private void LoadCategory(string category)
         {
             ActionPanel.Children.Clear();
-            
+
             var title = new TextBlock
             {
                 FontSize = 24,
@@ -44,7 +114,7 @@ namespace WindowsOptimizer
                 Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#58A6FF")),
                 Margin = new Thickness(0, 0, 0, 20)
             };
-            
+
             switch (category)
             {
                 case "PERFORMANCE":
@@ -57,7 +127,7 @@ namespace WindowsOptimizer
                     AddActionCard("💤 Desativar Hibernação", "Libera espaço em disco removendo hiberfil.sys", () => RunDisableHibernation());
                     AddActionCard("🔋 Relatório de Energia", "Gera diagnóstico completo de energia e abre no navegador", () => RunEnergyReport());
                     break;
-                    
+
                 case "LIMPEZA":
                     title.Text = "🧹 Limpeza";
                     ActionPanel.Children.Add(title);
@@ -67,16 +137,16 @@ namespace WindowsOptimizer
                     AddActionCard("🌐 Limpar Cache DNS", "Resolve problemas de conexão limpando o cache DNS", () => RunFlushDNS());
                     AddActionCard("🔄 Limpar SoftwareDistribution", "Remove cache do Windows Update", () => RunCleanSoftwareDistribution());
                     break;
-                    
+
                 case "SEGURANCA":
                     title.Text = "🛡️ Segurança";
                     ActionPanel.Children.Add(title);
                     AddActionCard("💾 Backup de Registro", "Salva o estado atual do registro do Windows", () => RunRegistryBackup());
-                    AddActionCard("�� Ponto de Restauração", "Cria um checkpoint do sistema Windows", () => RunCreateRestorePoint());
+                    AddActionCard("📍 Ponto de Restauração", "Cria um checkpoint do sistema Windows", () => RunCreateRestorePoint());
                     AddActionCard("🏥 Diagnóstico de Saúde", "Mostra informações de CPU, RAM, Disco e Sistema", () => RunHealthDiagnostic());
                     AddActionCard("🦠 Windows Defender Scan", "Inicia uma verificação rápida de ameaças", () => RunDefenderScan());
                     break;
-                    
+
                 case "PRIVACIDADE":
                     title.Text = "🔒 Privacidade";
                     ActionPanel.Children.Add(title);
@@ -85,7 +155,7 @@ namespace WindowsOptimizer
                     AddActionCard("🎤 Desativar Cortana", "Desliga a assistente de voz da Microsoft", () => RunDisableCortana());
                     AddActionCard("📅 Desativar Timeline", "Remove o histórico de atividades do Windows", () => RunDisableTimeline());
                     break;
-                    
+
                 case "VISUAIS":
                     title.Text = "🎨 Visuais";
                     ActionPanel.Children.Add(title);
@@ -94,7 +164,7 @@ namespace WindowsOptimizer
                     AddActionCard("🪟 Desativar Transparência", "Remove o efeito de vidro das janelas", () => RunDisableTransparency());
                     AddActionCard("⚡ Desativar Animações", "Torna as janelas instantâneas sem animação", () => RunDisableAnimations());
                     break;
-                    
+
                 case "SERVICOS":
                     title.Text = "⚙️ Serviços";
                     ActionPanel.Children.Add(title);
@@ -103,7 +173,7 @@ namespace WindowsOptimizer
                     AddActionCard("🔍 Desativar Windows Search", "Para o indexador de busca do Windows", () => RunDisableSearch());
                     AddActionCard("🎮 Desativar Xbox Services", "Para todos os serviços de gaming da Microsoft", () => RunDisableXboxServices());
                     break;
-                    
+
                 case "UPDATE":
                     title.Text = "🔄 Windows Update";
                     ActionPanel.Children.Add(title);
@@ -111,7 +181,7 @@ namespace WindowsOptimizer
                     AddActionCard("⏸️ Pausar por 7 dias", "Adia as atualizações por uma semana", () => RunPauseUpdates());
                     AddActionCard("▶️ Retomar Atualizações", "Remove a pausa e permite updates", () => RunResumeUpdates());
                     break;
-                    
+
                 case "DEVTOOLS":
                     title.Text = "💻 Dev Tools";
                     ActionPanel.Children.Add(title);
@@ -119,9 +189,9 @@ namespace WindowsOptimizer
                     AddActionCard("💻 Instalar VS Code", "Editor de código leve e poderoso", () => InstallPackage("Microsoft.VisualStudioCode", "VS Code"));
                     AddActionCard("🟢 Instalar Node.js", "Runtime JavaScript para desenvolvimento web", () => InstallPackage("OpenJS.NodeJS.LTS", "Node.js"));
                     AddActionCard("🐍 Instalar Python", "Linguagem versátil para scripts e IA", () => InstallPackage("Python.Python.3.12", "Python"));
-                    AddActionCard("�� Instalar Docker", "Containerização de aplicações", () => InstallPackage("Docker.DockerDesktop", "Docker"));
+                    AddActionCard("🐳 Instalar Docker", "Containerização de aplicações", () => InstallPackage("Docker.DockerDesktop", "Docker"));
                     break;
-                    
+
                 case "SDKS":
                     title.Text = "📦 SDKs";
                     ActionPanel.Children.Add(title);
@@ -130,7 +200,7 @@ namespace WindowsOptimizer
                     AddActionCard("🦀 Instalar Rust", "Linguagem de sistemas de alto desempenho", () => InstallPackage("Rustlang.Rustup", "Rust"));
                     AddActionCard("🔷 Instalar Go", "Linguagem rápida do Google", () => InstallPackage("GoLang.Go", "Go"));
                     break;
-                    
+
                 case "WSL2":
                     title.Text = "🐧 WSL2";
                     ActionPanel.Children.Add(title);
@@ -139,7 +209,7 @@ namespace WindowsOptimizer
                     AddActionCard("🔴 Instalar Debian", "Distribuição Linux estável e confiável", () => InstallPackage("Debian.Debian", "Debian"));
                     AddActionCard("📋 Status WSL", "Lista as distribuições instaladas", () => RunWSLStatus());
                     break;
-                    
+
                 case "REDE":
                     title.Text = "🌐 Rede";
                     ActionPanel.Children.Add(title);
@@ -148,7 +218,7 @@ namespace WindowsOptimizer
                     AddActionCard("🔧 Reset Winsock", "Corrige problemas de rede resetando pilha TCP/IP", () => RunResetWinsock());
                     AddActionCard("🔄 Renovar IP", "Solicita novo IP do servidor DHCP", () => RunRenewIP());
                     break;
-                    
+
                 case "BLOATWARES":
                     title.Text = "🗑️ Bloatwares";
                     ActionPanel.Children.Add(title);
@@ -158,7 +228,7 @@ namespace WindowsOptimizer
                     AddActionCard("💬 Remover Skype", "Remove o Skype do sistema", () => RunRemoveSkype());
                     AddActionCard("☁️ Remover OneDrive", "Desinstala o OneDrive completamente", () => RunRemoveOneDrive());
                     break;
-                    
+
                 case "PERFIS":
                     title.Text = "👤 Perfis";
                     ActionPanel.Children.Add(title);
@@ -166,7 +236,7 @@ namespace WindowsOptimizer
                     AddActionCard("💻 Perfil DEV", "Instala ferramentas essenciais para desenvolvedores", () => RunProfileDev());
                     AddActionCard("📊 Perfil OFFICE", "Otimiza para trabalho e produtividade", () => RunProfileOffice());
                     break;
-                    
+
                 case "SELFUPDATE":
                     title.Text = "🚀 Self-Update";
                     ActionPanel.Children.Add(title);
@@ -176,6 +246,8 @@ namespace WindowsOptimizer
             }
         }
 
+        // Cards agora aceitam Action (lambda síncrono) — o handler faz o wrap em
+        // Task.Run para não bloquear a UI. Mantém a API simples nos calls acima.
         private void AddActionCard(string name, string description, Action action)
         {
             var card = new Border
@@ -213,7 +285,8 @@ namespace WindowsOptimizer
                 Style = (Style)FindResource("ActionButton"),
                 VerticalAlignment = VerticalAlignment.Center
             };
-            btn.Click += (s, e) => action();
+            // Executa a ação em background (Task.Run) para não congelar a UI — bug #3
+            btn.Click += async (s, e) => { IsBusy(true); try { await Task.Run(action); } catch (Exception ex) { AddLog("ERRO", ex.Message); } finally { IsBusy(false); } };
 
             Grid.SetColumn(textPanel, 0);
             Grid.SetColumn(btn, 1);
@@ -223,8 +296,46 @@ namespace WindowsOptimizer
             ActionPanel.Children.Add(card);
         }
 
-        // === IMPLEMENTAÇÕES DAS AÇÕES ===
-        
+        // Feedback visual de ocupado (desabilita os botões durante execução)
+        private void IsBusy(bool busy)
+        {
+            // Permite que o usuário veja que algo está rodando.
+            Cursor = busy ? Cursors.Wait : Cursors.Arrow;
+        }
+
+        // === NÚCLEO ASSÍNCRONO ===
+        // RunCommandAsync roda o processo em Task.Run — não bloqueia a thread da UI.
+        // Retorna o exit code para que as ações possam validar sucesso/falha de verdade
+        // (corrige o problema do "loga OK mesmo falhando").
+
+        private async Task<int> RunCommandAsync(string cmd, string args = "")
+        {
+            return await Task.Run(() =>
+            {
+                try
+                {
+                    var psi = new ProcessStartInfo
+                    {
+                        FileName = cmd,
+                        Arguments = args,
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true
+                    };
+                    var proc = Process.Start(psi);
+                    proc.WaitForExit();
+                    return proc.ExitCode;
+                }
+                catch (Exception ex)
+                {
+                    AddLog("ERRO", ex.Message);
+                    return -1;
+                }
+            });
+        }
+
+        // Mantém RunCommand síncrono para uso interno dentro de Task.Run (não na UI)
         private void RunCommand(string cmd, string args = "")
         {
             try
@@ -249,28 +360,27 @@ namespace WindowsOptimizer
 
         private void SetRegistry(string path, string name, object value, RegistryValueKind kind = RegistryValueKind.DWord)
         {
+            // Pré-fixos explícitos HKLM/HKCU. Se a chave pertence ao HKLM e falhar
+            // (sem admin), NÃO reescreve silenciosamente em HKCU (evita gravar no
+            // hive errado). Só faz fallback quando a chave é claramente de usuário.
+            bool targetUser = path.StartsWith("HKCU", StringComparison.OrdinalIgnoreCase)
+                              || path.StartsWith("Software\\Microsoft\\Windows\\CurrentVersion\\Themes", StringComparison.OrdinalIgnoreCase)
+                              || path.StartsWith("Software\\Microsoft\\GameBar", StringComparison.OrdinalIgnoreCase)
+                              || path.StartsWith("Software\\Microsoft\\Windows\\CurrentVersion\\AdvertisingInfo", StringComparison.OrdinalIgnoreCase);
+
             try
             {
-                using (var key = Registry.LocalMachine.CreateSubKey(path.Replace("HKLM\\", "")))
+                RegistryKey root = targetUser ? Registry.CurrentUser : Registry.LocalMachine;
+                string sub = path.Replace("HKLM\\", "").Replace("HKCU\\", "");
+                using (var key = root.CreateSubKey(sub))
                 {
                     key?.SetValue(name, value, kind);
                 }
                 AddLog("OK", $"Registro atualizado: {name}");
             }
-            catch
+            catch (Exception ex)
             {
-                try
-                {
-                    using (var key = Registry.CurrentUser.CreateSubKey(path.Replace("HKCU\\", "")))
-                    {
-                        key?.SetValue(name, value, kind);
-                    }
-                    AddLog("OK", $"Registro atualizado: {name}");
-                }
-                catch (Exception ex)
-                {
-                    AddLog("ERRO", ex.Message);
-                }
+                AddLog("ERRO", $"Falha ao gravar {name}: {ex.Message}");
             }
         }
 
@@ -292,10 +402,10 @@ namespace WindowsOptimizer
                 if (!string.IsNullOrEmpty(line))
                     AddLog("WINGET", line.Trim());
             }
-            AddLog("OK", $"{name} processado!");
+            AddLog(proc.ExitCode == 0 ? "OK" : "WARN", $"{name} processado (exit {proc.ExitCode})!");
         }
 
-        // Performance
+        // === PERFORMANCE ===
         private void RunUltimatePerformance()
         {
             AddLog("EXEC", "Ativando Ultimate Performance...");
@@ -333,9 +443,9 @@ namespace WindowsOptimizer
         {
             string report = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "energy-report.html");
             AddLog("EXEC", "Gerando relatório de energia...");
-            RunCommand("powercfg", $"/energy /output \"{report}\"");
-            System.Threading.Thread.Sleep(3000);
-            if (File.Exists(report))
+            // Sem Thread.Sleep (bug #3): espera o processo de verdade terminar
+            int code = RunCommandSyncReturn("powercfg", $"/energy /output \"{report}\"");
+            if (code == 0 && File.Exists(report))
             {
                 Process.Start(new ProcessStartInfo(report) { UseShellExecute = true });
                 AddLog("OK", $"🔋 Relatório aberto: {report}");
@@ -346,25 +456,63 @@ namespace WindowsOptimizer
             }
         }
 
-        // Limpeza
+        // Helper: RunCommand que retorna exit code (para validação real)
+        private int RunCommandSyncReturn(string cmd, string args = "")
+        {
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = cmd,
+                    Arguments = args,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+                var proc = Process.Start(psi);
+                proc.WaitForExit();
+                return proc.ExitCode;
+            }
+            catch (Exception ex)
+            {
+                AddLog("ERRO", ex.Message);
+                return -1;
+            }
+        }
+
+        // === LIMPEZA ===
         private void RunCleanTemp()
         {
             AddLog("EXEC", "Limpando TEMP...");
             try
             {
-                foreach (var file in Directory.GetFiles(Path.GetTempPath(), "*", SearchOption.AllDirectories))
-                {
-                    try { File.Delete(file); } catch { }
-                }
+                // bug #9: agora remove subdiretórios também (deleção recursiva)
+                CleanDirectoryRecursive(Path.GetTempPath());
                 AddLog("OK", "🗂️ Arquivos temporários limpos!");
             }
             catch { AddLog("WARN", "Alguns arquivos não puderam ser removidos."); }
         }
 
+        // Limpa arquivos E subpastas recursivamente (corrige bug #9)
+        private void CleanDirectoryRecursive(string dir)
+        {
+            if (!Directory.Exists(dir)) return;
+            foreach (var file in Directory.GetFiles(dir, "*", SearchOption.TopDirectoryOnly))
+            {
+                try { File.Delete(file); } catch { /* em uso */ }
+            }
+            foreach (var sub in Directory.GetDirectories(dir, "*", SearchOption.TopDirectoryOnly))
+            {
+                try { Directory.Delete(sub, recursive: true); } catch { /* em uso */ }
+            }
+        }
+
         private void RunEmptyRecycleBin()
         {
-            RunCommand("cmd", "/c rd /s /q C:\\$Recycle.Bin");
-            AddLog("OK", "🗑️ Lixeira esvaziada!");
+            // bug #10: Clear-RecycleBin limpa TODAS as unidades (antes só C:\$Recycle.Bin)
+            int code = RunCommandSyncReturn("powershell", "-Command \"Clear-RecycleBin -Force -ErrorAction SilentlyContinue\"");
+            AddLog(code == 0 ? "OK" : "WARN", "🗑️ Lixeira esvaziada!");
         }
 
         private void RunCleanPrefetch()
@@ -387,7 +535,7 @@ namespace WindowsOptimizer
             AddLog("OK", "🔄 Cache do Windows Update limpo!");
         }
 
-        // Segurança
+        // === SEGURANÇA ===
         private void RunRegistryBackup()
         {
             string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "WindowsOptimizerBackups");
@@ -431,7 +579,7 @@ namespace WindowsOptimizer
             AddLog("OK", "🦠 Scan iniciado em segundo plano!");
         }
 
-        // Privacidade
+        // === PRIVACIDADE ===
         private void RunDisableTelemetry()
         {
             SetRegistry(@"SOFTWARE\Policies\Microsoft\Windows\DataCollection", "AllowTelemetry", 0);
@@ -456,7 +604,7 @@ namespace WindowsOptimizer
             AddLog("OK", "📅 Timeline desativada!");
         }
 
-        // Visuais
+        // === VISUAIS ===
         private void RunDarkTheme()
         {
             SetRegistry(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme", 0);
@@ -479,11 +627,11 @@ namespace WindowsOptimizer
 
         private void RunDisableAnimations()
         {
-            SetRegistry(@"Control Panel\Desktop\WindowMetrics", "MinAnimate", "0");
+            SetRegistry(@"Control Panel\Desktop\WindowMetrics", "MinAnimate", "0", RegistryValueKind.String);
             AddLog("OK", "⚡ Animações desativadas!");
         }
 
-        // Serviços
+        // === SERVIÇOS ===
         private void StopAndDisableService(string name)
         {
             RunCommand("net", $"stop {name}");
@@ -518,7 +666,7 @@ namespace WindowsOptimizer
             AddLog("OK", "🎮 Serviços Xbox desativados!");
         }
 
-        // Windows Update
+        // === WINDOWS UPDATE ===
         private void RunCheckUpdates()
         {
             AddLog("EXEC", "Verificando atualizações...");
@@ -546,7 +694,7 @@ namespace WindowsOptimizer
             AddLog("OK", "▶️ Atualizações retomadas!");
         }
 
-        // WSL2
+        // === WSL2 ===
         private void RunEnableWSL()
         {
             AddLog("EXEC", "Habilitando WSL2...");
@@ -557,32 +705,54 @@ namespace WindowsOptimizer
         private void RunWSLStatus()
         {
             AddLog("EXEC", "Verificando status do WSL...");
-            var psi = new ProcessStartInfo
+            // bug #3: roda em Task.Run para não bloquear a UI
+            Task.Run(() =>
             {
-                FileName = "wsl",
-                Arguments = "--list --verbose",
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true
-            };
-            var proc = Process.Start(psi);
-            string output = proc.StandardOutput.ReadToEnd();
-            AddLog("INFO", output);
+                try
+                {
+                    var psi = new ProcessStartInfo
+                    {
+                        FileName = "wsl",
+                        Arguments = "--list --verbose",
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        RedirectStandardOutput = true
+                    };
+                    var proc = Process.Start(psi);
+                    string output = proc.StandardOutput.ReadToEnd();
+                    proc.WaitForExit();
+                    AddLog("INFO", output);
+                }
+                catch (Exception ex) { AddLog("ERRO", ex.Message); }
+            });
         }
 
-        // Rede
+        // === REDE ===
+        // bug #4: DNS agora aplicado a TODOS os adaptadores ativos (Up),
+        // não apenas "Ethernet". Usa Get-NetAdapter (igual modules/network.ps1).
+        private void ApplyDnsToActiveAdapters(string primary, string secondary)
+        {
+            // PowerShell: lista adaptadores Up e aplica Set-DnsClientServerAddress
+            string script =
+                "Get-NetAdapter | Where-Object { $_.Status -eq 'Up' } | ForEach-Object { " +
+                $"Set-DnsClientServerAddress -InterfaceIndex $_.ifIndex -ServerAddresses ('{primary}','{secondary}') " +
+                "}";
+            int code = RunCommandSyncReturn("powershell", $"-Command \"{script}\"");
+            AddLog(code == 0 ? "OK" : "WARN", code == 0
+                ? $"🌐 DNS aplicado a todos os adaptadores ativos ({primary})."
+                : "⚠️ Verifique se há adaptadores ativos.");
+        }
+
         private void RunDNSCloudflare()
         {
-            RunCommand("netsh", "interface ip set dns \"Ethernet\" static 1.1.1.1 primary");
-            RunCommand("netsh", "interface ip add dns \"Ethernet\" 1.0.0.1 index=2");
-            AddLog("OK", "☁️ DNS Cloudflare configurado!");
+            AddLog("EXEC", "Configurando DNS Cloudflare...");
+            ApplyDnsToActiveAdapters("1.1.1.1", "1.0.0.1");
         }
 
         private void RunDNSGoogle()
         {
-            RunCommand("netsh", "interface ip set dns \"Ethernet\" static 8.8.8.8 primary");
-            RunCommand("netsh", "interface ip add dns \"Ethernet\" 8.8.4.4 index=2");
-            AddLog("OK", "🔵 DNS Google configurado!");
+            AddLog("EXEC", "Configurando DNS Google...");
+            ApplyDnsToActiveAdapters("8.8.8.8", "8.8.4.4");
         }
 
         private void RunResetWinsock()
@@ -599,7 +769,7 @@ namespace WindowsOptimizer
             AddLog("OK", "🔄 IP renovado!");
         }
 
-        // Bloatwares
+        // === BLOATWARES ===
         private void RunRemoveXbox()
         {
             RunCommand("powershell", "-Command \"Get-AppxPackage *xbox* | Remove-AppxPackage\"");
@@ -624,18 +794,52 @@ namespace WindowsOptimizer
             AddLog("OK", "💬 Skype removido!");
         }
 
+        // bug #8: detecta OneDrive em múltiplos paths (per-user, SysWOW64, System32)
+        // e faz fallback para winget uninstall se não achar o setup.
         private void RunRemoveOneDrive()
         {
+            AddLog("EXEC", "Removendo OneDrive...");
             RunCommand("taskkill", "/F /IM OneDrive.exe");
-            string path = Path.Combine(Environment.GetEnvironmentVariable("SYSTEMROOT"), "SysWOW64", "OneDriveSetup.exe");
-            if (File.Exists(path))
+
+            string setupPath = FindOneDriveSetup();
+            if (setupPath != null)
             {
-                RunCommand(path, "/uninstall");
+                int code = RunCommandSyncReturn(setupPath, "/uninstall");
+                AddLog(code == 0 ? "OK" : "WARN", code == 0
+                    ? "☁️ OneDrive removido!"
+                    : "⚠️ Falha ao desinstalar via setup. Tentando winget...");
+                if (code != 0)
+                    TryWingetUninstallOneDrive();
             }
-            AddLog("OK", "☁️ OneDrive removido!");
+            else
+            {
+                AddLog("INFO", "Setup do OneDrive não encontrado. Tentando winget...");
+                TryWingetUninstallOneDrive();
+            }
         }
 
-        // Perfis
+        private static string FindOneDriveSetup()
+        {
+            string systemRoot = Environment.GetEnvironmentVariable("SYSTEMROOT") ?? @"C:\Windows";
+            string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            var candidates = new[]
+            {
+                Path.Combine(systemRoot, "SysWOW64", "OneDriveSetup.exe"),       // 64-bit
+                Path.Combine(systemRoot, "System32", "OneDriveSetup.exe"),       // 32-bit
+                Path.Combine(localAppData, "Microsoft", "OneDrive", "OneDriveSetup.exe") // per-user
+            };
+            foreach (var p in candidates)
+                if (File.Exists(p)) return p;
+            return null;
+        }
+
+        private void TryWingetUninstallOneDrive()
+        {
+            int code = RunCommandSyncReturn("winget", "uninstall Microsoft.OneDrive --silent --accept-source-agreements");
+            AddLog(code == 0 ? "OK" : "WARN", code == 0 ? "☁️ OneDrive removido via winget!" : "⚠️ winget também não conseguiu remover.");
+        }
+
+        // === PERFIS ===
         private void RunProfileGamer()
         {
             AddLog("EXEC", "Aplicando perfil Gamer...");
@@ -661,20 +865,27 @@ namespace WindowsOptimizer
             AddLog("OK", "📊 Perfil OFFICE aplicado!");
         }
 
-        // Self-Update
-        private void RunCheckVersion()
+        // === SELF-UPDATE ===
+        // bug #1: URL agora aponta para o repo correto (CEOPS_Otimizador_Windows).
+        // bug #3: download assíncrono (DownloadStringTaskAsync) — não congela a UI.
+        // bug #5: comparação por System.Version (não string) + versão centralizada.
+        private async void RunCheckVersion()
         {
             AddLog("EXEC", "Verificando versão...");
-            AddLog("INFO", "Versão local: 6.0.0");
+            AddLog("INFO", $"Versão local: {AppVersion}");
             try
             {
-                System.Net.WebClient client = new System.Net.WebClient();
-                string remote = client.DownloadString("https://raw.githubusercontent.com/denalth/otimizador_windows/main/version.txt").Trim();
-                AddLog("INFO", $"Versão remota: {remote}");
-                if (string.Compare(remote, "6.0.0") > 0)
-                    AddLog("WARN", $"🚀 NOVA VERSÃO DISPONÍVEL: {remote}");
-                else
-                    AddLog("OK", "✅ Você está na versão mais recente!");
+                using (var client = new System.Net.WebClient())
+                {
+                    string remote = (await client.DownloadStringTaskAsync(VersionUrl)).Trim();
+                    AddLog("INFO", $"Versão remota: {remote}");
+
+                    var localVer = new Version(AppVersion);
+                    if (Version.TryParse(remote, out var remoteVer) && remoteVer > localVer)
+                        AddLog("WARN", $"🚀 NOVA VERSÃO DISPONÍVEL: {remote}");
+                    else
+                        AddLog("OK", "✅ Você está na versão mais recente!");
+                }
             }
             catch (Exception ex)
             {
@@ -684,8 +895,8 @@ namespace WindowsOptimizer
 
         private void RunOpenGitHub()
         {
-            Process.Start(new ProcessStartInfo("https://github.com/denalth/otimizador_windows/releases") { UseShellExecute = true });
-            AddLog("OK", "�� Página do GitHub aberta!");
+            Process.Start(new ProcessStartInfo(ReleasesUrl) { UseShellExecute = true });
+            AddLog("OK", "🌐 Página do GitHub aberta!");
         }
     }
 }
