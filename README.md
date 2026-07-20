@@ -1,44 +1,94 @@
-# Autoria: @denalth
-# Windows Optimizer v7.1.0 (Interface WPF Premium)
+<div align="center">
 
-O otimizador definitivo para Windows 11 com **interface WPF moderna**, **emojis coloridos** e **acentuação pt-BR**.
+<img width="100%" src="https://capsule-render.vercel.app/api?type=waving&color=0:0E1117,50:0078D4,100:CA5010&height=120&section=header&fontSize=0" alt="banner" />
 
-![Version](https://img.shields.io/badge/Version-7.1.0-blue)
-![License](https://img.shields.io/badge/License-MIT-green)
+<br>
 
-## ✨ Novidades da v7.1.0
-- 💻 **Hibernar ao Fechar a Tampa**: em notebooks, ativa hibernação e faz o PC hibernar ao fechar a tampa (na tomada **e** na bateria). Detecção automática de equipamento portátil — o card só aparece em laptops.
-- 🧹 **Detecção de hardware**: verifica suporte a hibernação (`powercfg /a`) e avisa quando o hardware não suporta.
+# 🛡️ CEOPS
 
-## 📜 Novidades da v7.0.0
-- 🧹 **Refatoração Arquitetural**: eliminação da triplicação de código (uma única GUI WPF C#).
-- ⚡ **UI Não-Bloqueante**: ações executam em background com `async/await` + `Task.Run` (a janela não congela mais).
-- 🌐 **DNS Inteligente**: aplica DNS em todos os adaptadores ativos (Wi-Fi e Ethernet), não apenas "Ethernet".
-- ☁️ **OneDrive Multi-Path**: detecta instalação em SysWOW64, System32 ou per-user, com fallback via winget.
-- 🗑️ **Limpeza Completa**: TEMP recursivo (arquivos + subpastas) e Lixeira de todas as unidades.
-- 🔒 **Self-Update Corrigido**: aponta para o repositório correto e compara versões semanticamente (`System.Version`).
-- 🔐 **Auto-Elevação**: a própria GUI verifica privilégios de admin e se re-eleva via UAC.
+### Otimizador Windows corporativo para frotas de TI pública
 
-## 🚀 Início Rápido
-1. Compile o projeto WPF (`dotnet build WindowsOptimizerWPF`) **ou** execute `WindowsOptimizer.exe`.
-2. O app pede elevação de administrador automaticamente (UAC).
-3. Selecione uma categoria no menu lateral (com emojis!).
-4. Clique em EXECUTAR e acompanhe o log em tempo real.
+</div>
 
-## 🖥️ Modo Terminal (sem GUI)
-Para uso em linha de comando, use o orquestrador:
-```powershell
-powershell -ExecutionPolicy Bypass -File main-orquestrador.ps1
+---
+
+## 📋 Sobre
+
+Script PowerShell para **otimização, manutenção e diagnóstico** de máquinas Windows em ambientes corporativos &mdash; desenhado para técnicos de campo que precisam padronizar frotas de centenas de máquinas com segurança e rastreabilidade.
+
+Construído em **TI pública municipal** (Fortaleza/CE), atende cenários reais de deployment em massa via GPO e intervenção técnica local.
+
+> **Status:** `institutional` &mdash; projeto de uso institucional. Detalhes de implementação e código-fonte são restritos.
+
+---
+
+## ✨ Funcionalidades
+
+| # | Categoria | O que faz |
+|---|---|---|
+| 1 | **Diagnóstico** | SFC, DISM, relatórios de disco (S.M.A.R.T., SSD/HDD) |
+| 2 | **Otimização** | Limpeza de temporários, cache de Windows Update, registry |
+| 3 | **Padronização** | Desinstala bloatware, instala apps essenciais (winget) |
+| 4 | **Perfis** | Lista e remove perfis de usuário órfãos (com checagem de login) |
+| 5 | **Atualizações** | Busca e instala updates sem reboot surpresa |
+| 6 | **Segurança** | Restore Point automático, criptografia AES de credenciais |
+| 7 | **Deploy** | Pre-Flight Check + modos Interactive / Silent / GPO |
+| 8 | **Manutenção** | Self-Update com versionamento automático |
+
+---
+
+## 🎯 Modos de operação
+
+```
+Interactive     Técnico local — GUI WPF para uso em campo
+Silent          Linha de comando — automação por scripts
+GPO             Deploy em massa via Group Policy (centenas de máquinas)
 ```
 
-## 📦 Categorias
-⚡ Performance | 🧹 Limpeza | 🛡️ Segurança | 🔒 Privacidade | 🎨 Visuais | ⚙️ Serviços | 🔄 Windows Update | 💻 Dev Tools | 📦 SDKs | 🐧 WSL2 | 🌐 Rede | 🗑️ Bloatwares | 👤 Perfis | 🚀 Self-Update
+---
 
-## 🏗️ Arquitetura
+## 🧰 Stack técnica
+
 ```
-WindowsOptimizerWPF/   → GUI WPF C# (única interface)
-modules/*.ps1          → Backend modular de otimização (terminal)
-main-orquestrador.ps1  → Menu de terminal que carrega os módulos
+PowerShell 5.1+     Núcleo do script (arquivo único)
+WPF / XAML          Interface gráfica
+winget              Gestão de pacotes
+AES-256             Criptografia de credenciais locais
+Pester              Testes de regressão
+Group Policy        Deploy corporativo
 ```
 
-Desenvolvido com 💜 por @denalth | 2026
+---
+
+## 🔒 Segurança
+
+- Credenciais criptografadas em **AES-256** localmente
+- `config.json` protegido por `.gitignore` (nunca versionado)
+- **Pre-Flight Check** valida pré-requisitos antes de qualquer alteração
+- **Restore Point** automático antes de mudanças críticas
+- **Roadmap:** migrar ofuscação local para HTTPS/API com token próprio
+
+---
+
+## 👥 Autoria
+
+| Versão | Autores |
+|---|---|
+| **v2.4** | Daniel Filho, Wellington |
+| **v3.0** | Revisão e refatoração &mdash; [@denalth](https://github.com/denalth) (2026) |
+
+---
+
+## 📄 Licença
+
+Uso institucional. Detalhes conforme política da organização.
+
+---
+
+<div align="center">
+
+<sub><i>
+@denalth &mdash; Singularidade Técnica &mdash; vSINGULARITY_ZENITH_v2
+</i></sub>
+
+</div>
